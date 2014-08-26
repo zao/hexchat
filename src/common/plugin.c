@@ -1746,137 +1746,91 @@ hexchat_free (hexchat_plugin *ph, void *ptr)
 static int
 hexchat_pluginpref_set_str_real (hexchat_plugin *pl, const char *var, const char *value, int mode) /* mode: 0 = delete, 1 = save */
 {
-	FILE *fpIn;
-	int fhOut;
-	int prevSetting;
+	GFile *file, *tmpfile;
+	GOutputStream *ostream;
+	GInputStream *stream;
+	GDataInputStream *istream;
+	GFileIOStream *tmpstream;
+	gboolean ret;
 	char *confname;
-	char *confname_tmp;
-	char *buffer;
-	char *buffer_tmp;
-	char line_buffer[512];		/* the same as in cfg_put_str */
-	char *line_bufp = line_buffer;
+	char *line;
 	char *canon;
 
 	canon = g_strdup (pl->name);
 	canonalize_key (canon);
 	confname = g_strdup_printf ("addon_%s.conf", canon);
 	g_free (canon);
-	confname_tmp = g_strdup_printf ("%s.new", confname);
 
-	fhOut = hexchat_open_file (confname_tmp, O_TRUNC | O_WRONLY | O_CREAT, 0600, XOF_DOMODE);
-	fpIn = hexchat_fopen_file (confname, "r", 0);
+	file = hexchat_open_gfile (confname);
+	g_free (confname);
 
-	if (fhOut == -1)		/* unable to save, abort */
+	if (!g_file_query_exists (file, NULL))	/* no previous config file, no parsing */
 	{
-		g_free (confname);
-		g_free (confname_tmp);
-		return 0;
-	}
-	else if (fpIn == NULL)	/* no previous config file, no parsing */
-	{
-		if (mode)
+		if (mode == 0)
 		{
-			buffer = g_strdup_printf ("%s = %s\n", var, value);
-			write (fhOut, buffer, strlen (buffer));
-			g_free (buffer);
-			close (fhOut);
-
-			buffer = g_build_filename (get_xdir (), confname, NULL);
-			g_free (confname);
-			buffer_tmp = g_build_filename (get_xdir (), confname_tmp, NULL);
-			g_free (confname_tmp);
-
-#ifdef WIN32
-			g_unlink (buffer);
-#endif
-
-			if (g_rename (buffer_tmp, buffer) == 0)
-			{
-				g_free (buffer);
-				g_free (buffer_tmp);
-				return 1;
-			}
-			else
-			{
-				g_free (buffer);
-				g_free (buffer_tmp);
-				return 0;
-			}
-		}
-		else
-		{
-			/* mode = 0, we want to delete but the config file and thus the given setting does not exist, we're ready */
-			close (fhOut);
-			g_free (confname);
-			g_free (confname_tmp);
+			/* mode = 0, we want to delete but the config file and thus the given
+			* setting does not exist, we're ready */
+			g_object_unref (file);
 			return 1;
 		}
-	}
-	else	/* existing config file, preserve settings and find & replace current var value if any */
-	{
-		prevSetting = 0;
 
-		while (fscanf (fpIn, " %[^\n]", line_bufp) != EOF)	/* read whole lines including whitespaces */
+		ostream = G_OUTPUT_STREAM(g_file_create (file, G_FILE_CREATE_PRIVATE, NULL, NULL));
+		if (!ostream)
 		{
-			buffer_tmp = g_strdup_printf ("%s ", var);	/* add one space, this way it works against var - var2 checks too */
-
-			if (strncmp (buffer_tmp, line_buffer, strlen (var) + 1) == 0)	/* given setting already exists */
-			{
-				if (mode)									/* overwrite the existing matching setting if we are in save mode */
-				{
-					buffer = g_strdup_printf ("%s = %s\n", var, value);
-				}
-				else										/* erase the setting in delete mode */
-				{
-					buffer = g_strdup ("");
-				}
-
-				prevSetting = 1;
-			}
-			else
-			{
-				buffer = g_strdup_printf ("%s\n", line_buffer);	/* preserve the existing different settings */
-			}
-
-			write (fhOut, buffer, strlen (buffer));
-
-			g_free (buffer);
-			g_free (buffer_tmp);
-		}
-
-		fclose (fpIn);
-
-		if (!prevSetting && mode)	/* var doesn't exist currently, append if we're in save mode */
-		{
-			buffer = g_strdup_printf ("%s = %s\n", var, value);
-			write (fhOut, buffer, strlen (buffer));
-			g_free (buffer);
-		}
-
-		close (fhOut);
-
-		buffer = g_build_filename (get_xdir (), confname, NULL);
-		g_free (confname);
-		buffer_tmp = g_build_filename (get_xdir (), confname_tmp, NULL);
-		g_free (confname_tmp);
-
-#ifdef WIN32
-		g_unlink (buffer);
-#endif
-
-		if (g_rename (buffer_tmp, buffer) == 0)
-		{
-			g_free (buffer);
-			g_free (buffer_tmp);
-			return 1;
-		}
-		else
-		{
-			g_free (buffer);
-			g_free (buffer_tmp);
+			g_object_unref (file);
 			return 0;
 		}
+		
+		cfg_put_str (ostream, var, value);
+		return 1;
 	}
+
+	/* existing config file, preserve settings and find & replace current var value if any */	
+	tmpfile = g_file_new_tmp (NULL, &tmpstream, NULL);
+	if (!tmpfile)
+	{
+		g_object_unref (file);
+		return 0;
+	}
+	
+	stream = G_INPUT_STREAM(g_file_read (file, NULL, NULL));
+	if (!stream)
+	{
+		g_object_unref (file);
+		g_object_unref (tmpfile);
+		return 0;
+	}
+	
+	istream = g_data_input_stream_new (stream);
+	g_data_input_stream_set_newline_type (istream, G_DATA_STREAM_NEWLINE_TYPE_ANY);
+	g_object_unref (stream);
+	
+	ostream = g_io_stream_get_output_stream (G_IO_STREAM(tmpstream));
+
+	if (mode == 1)
+	{
+		/* Add new setting */
+		cfg_put_str (ostream, var, value);
+	}
+
+	while ((line = g_data_input_stream_read_line_utf8 (istream, NULL, NULL, NULL)))
+	{
+		/* Move over all old settings */
+		if (!g_str_has_prefix (line, var))
+		{
+			stream_writef (ostream, "%s\n", line);
+		}
+	}
+	
+	g_object_unref (tmpstream);
+	g_object_unref (istream);
+
+	ret = g_file_move (tmpfile, file, G_FILE_COPY_OVERWRITE, NULL, NULL, NULL, NULL);
+
+	g_object_unref (tmpfile);
+	g_object_unref (file);
+	
+	return ret;
 }
 
 int
@@ -1888,21 +1842,24 @@ hexchat_pluginpref_set_str (hexchat_plugin *pl, const char *var, const char *val
 static int
 hexchat_pluginpref_get_str_real (hexchat_plugin *pl, const char *var, char *dest, int dest_len)
 {
+	GFile *file;
 	char *confname, *canon, *cfg;
 
 	canon = g_strdup (pl->name);
 	canonalize_key (canon);
-	confname = g_strdup_printf ("%s%caddon_%s.conf", get_xdir(), G_DIR_SEPARATOR, canon);
+	confname = g_strdup_printf ("addon_%s.conf", canon);
 	g_free (canon);
+	
+	file = hexchat_open_gfile (confname);
+	g_free (confname);
 
-	if (!g_file_get_contents (confname, &cfg, NULL, NULL))
+	if (!g_file_load_contents (file, NULL, &cfg, NULL, NULL, NULL))
 	{
-		g_free (confname);
+		g_object_unref (file);
 		return 0;
 	}
 
-	g_free (confname);
-
+	g_object_unref (file);
 	if (!cfg_get_str (cfg, var, dest, dest_len))
 	{
 		g_free (cfg);
@@ -1953,35 +1910,42 @@ hexchat_pluginpref_delete (hexchat_plugin *pl, const char *var)
 int
 hexchat_pluginpref_list (hexchat_plugin *pl, char* dest)
 {
-	FILE *fpIn;
-	char confname[64];
-	char buffer[512];										/* the same as in cfg_put_str */
-	char *bufp = buffer;
-	char *token;
+	GFile *file;
+	GInputStream *stream;
+	GDataInputStream *istream;
+	char *confname, *canon, *buf;
 
-	token = g_strdup (pl->name);
-	canonalize_key (token);
-	sprintf (confname, "addon_%s.conf", token);
-	g_free (token);
+	canon = g_strdup (pl->name);
+	canonalize_key (canon);
+	confname = g_strdup_printf ("addon_%s.conf", canon);
+	g_free (canon);
 
-	fpIn = hexchat_fopen_file (confname, "r", 0);
+	file = hexchat_open_gfile (confname);
+	g_free (confname);
 
-	if (fpIn == NULL)										/* no existing config file, no parsing */
-	{
+	stream = G_INPUT_STREAM(g_file_read (file, NULL, NULL));
+	if (!stream)
 		return 0;
-	}
-	else													/* existing config file, get list of settings */
+
+	istream = g_data_input_stream_new (stream);
+	g_data_input_stream_set_newline_type (istream, G_DATA_STREAM_NEWLINE_TYPE_ANY);
+	g_object_unref (stream);
+
+	strcpy (dest, ""); /* clean up garbage */
+	while ((buf = g_data_input_stream_read_line_utf8 (istream, NULL, NULL, NULL)))
 	{
-		strcpy (dest, "");									/* clean up garbage */
-		while (fscanf (fpIn, " %[^\n]", bufp) != EOF)	/* read whole lines including whitespaces */
+		char *p = strchr (buf, '=');
+		if (p != NULL)
 		{
-			token = strtok (buffer, "=");
-			g_strlcat (dest, g_strchomp (token), 4096); /* Dest must not be smaller than this */
+			*p = '\0';
+			g_strlcat (dest, g_strchomp (buf), 4096); /* Dest must not be smaller than this */
 			g_strlcat (dest, ",", 4096);
 		}
-
-		fclose (fpIn);
+		g_free (buf);
 	}
+
+	g_object_unref (file);
+	g_object_unref (istream);
 
 	return 1;
 }
