@@ -54,6 +54,9 @@ FILE *hexchat_fopen_file (const char *file, const char *mode, int xof_flags);
 GFile *hexchat_open_gfile (const char *filename);
 gsize stream_writef (GOutputStream *ostream, const char *fmt, ...) G_GNUC_PRINTF (2, 3);
 
+char *unescape_newlines (const gchar  *value);
+char *escape_newlines (const gchar  *value);
+
 #define XOF_DOMODE 1
 #define XOF_FULLPATH 2
 

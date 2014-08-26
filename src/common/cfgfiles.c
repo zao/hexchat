@@ -170,6 +170,116 @@ list_delentry (GSList ** list, char *name)
 	return 0;
 }
 
+/*
+* Unescapes \\r and \\n as \r and \n.
+* Returns newly allocated string.
+*
+* Modified version of gkeyfile's unescaping.
+*/
+char *
+unescape_newlines (const gchar  *value)
+{
+	gchar *string_value, *p, *q0, *q;
+
+	string_value = g_new (gchar, strlen (value) + 1);
+
+	p = (gchar *) value;
+	q0 = q = string_value;
+	while (*p)
+	{
+		if (*p == '\\')
+	    {
+	    	p++;
+
+	    	switch (*p)
+	    	{
+        	case 'n':
+	    		*q = '\n';
+				break;
+        	case 'r':
+        		*q = '\r';
+        		break;
+	        case '\\':
+	        	*q = '\\';
+	        	break;
+	    	case '\0':
+				g_warning ("Escaped character at end of string.");
+	    		break;
+	        default:
+				*q++ = '\\';
+				*q = *p;
+				g_warning ("Invalid escape sequence.");
+	        	break;
+	        }
+	    }
+		else
+		{
+			*q = *p;
+		}
+
+		if (*p == '\0')
+			break;
+
+		q++;
+		p++;
+	}
+
+	*q = '\0';
+
+	return string_value;
+}
+
+/*
+ * Escapes \r and \n as \\r and \\n.
+ * Returns newly allocated string.
+ *
+ * Modified version of gkeyfile's escaping.
+ */
+char *
+escape_newlines (const char *str)
+{
+	gchar *value, *p, *q;
+	gsize len;
+
+	len = strlen (str) + 1;
+	value = g_new (gchar, 2 * len);
+
+	p = (gchar*)str;
+	q = value;
+
+	while (p < (str + len - 1))
+	{
+		gchar escaped_character[3] = { '\\', 0, 0 };
+
+		switch (*p)
+		{
+		case '\n':
+			escaped_character[1] = 'n';
+			strcpy (q, escaped_character);
+			q += 2;
+			break;
+		case '\r':
+			escaped_character[1] = 'r';
+			strcpy (q, escaped_character);
+			q += 2;
+			break;
+		case '\\':
+			escaped_character[1] = '\\';
+			strcpy (q, escaped_character);
+			q += 2;
+			break;
+		default:
+			*q = *p;
+			q++;
+			break;
+		}
+		p++;
+	}
+	*q = '\0';
+
+	return value;
+}
+
 char *
 cfg_get_str (char *cfg, const char *var, char *dest, int dest_len)
 {

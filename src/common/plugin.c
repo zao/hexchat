@@ -1752,9 +1752,7 @@ hexchat_pluginpref_set_str_real (hexchat_plugin *pl, const char *var, const char
 	GDataInputStream *istream;
 	GFileIOStream *tmpstream;
 	gboolean ret;
-	char *confname;
-	char *line;
-	char *canon;
+	char *confname, *line, *canon, *escaped_value;
 
 	canon = g_strdup (pl->name);
 	canonalize_key (canon);
@@ -1780,8 +1778,10 @@ hexchat_pluginpref_set_str_real (hexchat_plugin *pl, const char *var, const char
 			g_object_unref (file);
 			return 0;
 		}
-		
-		cfg_put_str (ostream, var, value);
+
+		escaped_value = escape_newlines (value);
+		cfg_put_str (ostream, var, escaped_value);
+		g_free (escaped_value);
 		return 1;
 	}
 
@@ -1810,7 +1810,9 @@ hexchat_pluginpref_set_str_real (hexchat_plugin *pl, const char *var, const char
 	if (mode == 1)
 	{
 		/* Add new setting */
-		cfg_put_str (ostream, var, value);
+		escaped_value = escape_newlines (value);
+		cfg_put_str (ostream, var, escaped_value);
+		g_free (escaped_value);
 	}
 
 	while ((line = g_data_input_stream_read_line_utf8 (istream, NULL, NULL, NULL)))
@@ -1843,7 +1845,8 @@ static int
 hexchat_pluginpref_get_str_real (hexchat_plugin *pl, const char *var, char *dest, int dest_len)
 {
 	GFile *file;
-	char *confname, *canon, *cfg;
+	char *confname, *canon, *cfg, *unescaped_value;
+	char buf[512], *bufp = buf;
 
 	canon = g_strdup (pl->name);
 	canonalize_key (canon);
@@ -1860,11 +1863,15 @@ hexchat_pluginpref_get_str_real (hexchat_plugin *pl, const char *var, char *dest
 	}
 
 	g_object_unref (file);
-	if (!cfg_get_str (cfg, var, dest, dest_len))
+	if (!cfg_get_str (cfg, var, buf, sizeof(buf)))
 	{
 		g_free (cfg);
 		return 0;
 	}
+	
+	unescaped_value = unescape_newlines (bufp);
+	g_strlcpy (dest, unescaped_value, dest_len);
+	g_free (unescaped_value);
 
 	g_free (cfg);
 	return 1;
