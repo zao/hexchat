@@ -188,30 +188,30 @@ unescape_newlines (const gchar  *value)
 	while (*p)
 	{
 		if (*p == '\\')
-	    {
-	    	p++;
+		{
+		p++;
 
-	    	switch (*p)
-	    	{
-        	case 'n':
-	    		*q = '\n';
+			switch (*p)
+			{
+			case 'n':
+				*q = '\n';
 				break;
-        	case 'r':
-        		*q = '\r';
-        		break;
-	        case '\\':
-	        	*q = '\\';
-	        	break;
-	    	case '\0':
+			case 'r':
+				*q = '\r';
+				break;
+			case '\\':
+				*q = '\\';
+				break;
+			case '\0':
 				g_warning ("Escaped character at end of string.");
-	    		break;
-	        default:
+				break;
+			default:
 				*q++ = '\\';
 				*q = *p;
 				g_warning ("Invalid escape sequence.");
-	        	break;
-	        }
-	    }
+				break;
+			}
+		}
 		else
 		{
 			*q = *p;
