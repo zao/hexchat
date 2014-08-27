@@ -1417,22 +1417,6 @@ hexchat_open_file (char *file, int flags, int mode, int xof_flags)
 	return fd;
 }
 
-FILE *
-hexchat_fopen_file (const char *file, const char *mode, int xof_flags)
-{
-	char *buf;
-	FILE *fh;
-
-	if (xof_flags & XOF_FULLPATH)
-		return fopen (file, mode);
-
-	buf = g_build_filename (get_xdir (), file, NULL);
-	fh = g_fopen (buf, mode);
-	g_free (buf);
-
-	return fh;
-}
-
 /*
  * Returns a #GFile* to a file in HexChat's config dir.
  * Must be g_object_unref()'d when done.
