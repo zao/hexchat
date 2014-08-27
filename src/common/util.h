@@ -50,6 +50,7 @@ char *country (char *);
 void country_search (char *pattern, void *ud, void (*print)(void *, char *, ...));
 char *get_sys_str (int with_cpu);
 void util_exec (const char *cmd);
+gboolean file_is_absolute (const gchar *filename);
 #define STRIP_COLOR 1
 #define STRIP_ATTRIB 2
 #define STRIP_HIDDEN 4

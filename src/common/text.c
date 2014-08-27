@@ -482,26 +482,9 @@ logmask_is_fullpath ()
 	/* Check if final path/filename is absolute or relative.
 	 * If one uses log mask variables, such as "%c/...", %c will be empty upon
 	 * connecting since there's no channel name yet, so we have to make sure
-	 * we won't try to write to the FS root. On Windows we can be sure it's
-	 * full path if the 2nd character is a colon since Windows doesn't allow
-	 * colons in filenames.
+	 * we won't try to write to the FS root.
 	 */
-#ifdef WIN32
-	/* Treat it as full path if it
-	 * - starts with '\' which denotes the root directory of the current drive letter
-	 * - starts with a drive letter and followed by ':'
-	 */
-	if (prefs.hex_irc_logmask[0] == '\\' || (((prefs.hex_irc_logmask[0] >= 'A' && prefs.hex_irc_logmask[0] <= 'Z') || (prefs.hex_irc_logmask[0] >= 'a' && prefs.hex_irc_logmask[0] <= 'z')) && prefs.hex_irc_logmask[1] == ':'))
-#else
-	if (prefs.hex_irc_logmask[0] == '/')
-#endif
-	{
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
+	return file_is_absolute (prefs.hex_irc_logmask);
 }
 
 static char *
@@ -2252,12 +2235,7 @@ sound_play (const char *file, gboolean quiet)
 		return;
 	}
 
-#ifdef WIN32
-	/* check for fullpath */
-	if (file[0] == '\\' || (((file[0] >= 'A' && file[0] <= 'Z') || (file[0] >= 'a' && file[0] <= 'z')) && file[1] == ':'))
-#else
-	if (file[0] == '/')
-#endif
+	if (file_is_absolute (file))
 	{
 		wavfile = g_strdup (file);
 	}

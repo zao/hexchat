@@ -1964,3 +1964,25 @@ strftime_utf8 (char *dest, gsize destsize, const char *format, time_t time)
 	g_date_free (date);
 	return result;
 }
+
+gboolean
+file_is_absolute (const gchar *filename)
+{
+	/*
+	 * On Windows we can be sure it's
+	 * full path if the 2nd character is a colon since Windows doesn't allow
+	 * colons in filenames.
+	 */
+#ifdef WIN32
+	/* Treat it as full path if it:
+	 * - starts with '\' which denotes the root directory of the current drive letter
+	 * - starts with a drive letter and followed by ':'
+	 */
+	if (filename[0] == '\\' || (((filename[0] >= 'A' && filename[0] <= 'Z') || (filename[0] >= 'a' && filename[0] <= 'z')) && filename[1] == ':'))
+#else
+	if (filename[0] == '/')
+#endif
+		return TRUE;
+	
+	return FALSE;
+}
