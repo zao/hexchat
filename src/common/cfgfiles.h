@@ -53,6 +53,7 @@ int hexchat_open_file (char *file, int flags, int mode, int xof_flags);
 FILE *hexchat_fopen_file (const char *file, const char *mode, int xof_flags);
 GFile *hexchat_open_gfile (const char *filename);
 gsize stream_writef (GOutputStream *ostream, const char *fmt, ...) G_GNUC_PRINTF (2, 3);
+GDataInputStream *file_get_datainputstream (GFile *file);
 
 char *unescape_newlines (const gchar  *value);
 char *escape_newlines (const gchar  *value);

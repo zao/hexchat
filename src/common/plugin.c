@@ -1918,7 +1918,6 @@ int
 hexchat_pluginpref_list (hexchat_plugin *pl, char* dest)
 {
 	GFile *file;
-	GInputStream *stream;
 	GDataInputStream *istream;
 	char *confname, *canon, *buf;
 
@@ -1930,13 +1929,9 @@ hexchat_pluginpref_list (hexchat_plugin *pl, char* dest)
 	file = hexchat_open_gfile (confname);
 	g_free (confname);
 
-	stream = G_INPUT_STREAM(g_file_read (file, NULL, NULL));
-	if (!stream)
+	istream = file_get_datainputstream (file);
+	if (!istream)
 		return 0;
-
-	istream = g_data_input_stream_new (stream);
-	g_data_input_stream_set_newline_type (istream, G_DATA_STREAM_NEWLINE_TYPE_ANY);
-	g_object_unref (stream);
 
 	strcpy (dest, ""); /* clean up garbage */
 	while ((buf = g_data_input_stream_read_line_utf8 (istream, NULL, NULL, NULL)))
