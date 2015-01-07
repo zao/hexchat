@@ -48,6 +48,11 @@
 #include "hexchatc.h"
 #include "chanopt.h"
 
+static const char *sasl_mechanisms [] =
+{
+	"PLAIN",
+	"EXTERNAL"
+};
 
 void
 clear_channel (session *sess)
@@ -1684,18 +1689,16 @@ inbound_cap_ack (server *serv, char *nick, char *extensions,
 		if (serv->loginmethod == LOGIN_SASLEXTERNAL)
 		{
 			serv->sasl_mech = MECH_EXTERNAL;
-			tcp_send_len (serv, "AUTHENTICATE EXTERNAL\r\n", 23);
 		}
 		else
 		{
-			/* default to most secure, it will fallback if not supported */
-			serv->sasl_mech = MECH_AES;
-			tcp_send_len (serv, "AUTHENTICATE DH-AES\r\n", 21);
+			serv->sasl_mech = MECH_PLAIN;
 		}
 #else
 		serv->sasl_mech = MECH_PLAIN;
-		tcp_send_len (serv, "AUTHENTICATE PLAIN\r\n", 20);
 #endif
+
+		tcp_sendf (serv, "AUTHENTICATE %s\r\n", sasl_mechanisms[serv->sasl_mech]);
 	}
 }
 
@@ -1817,32 +1820,15 @@ inbound_cap_list (server *serv, char *nick, char *extensions,
 								  NULL, NULL, 0, tags_data->timestamp);
 }
 
-static const char *sasl_mechanisms[] =
-{
-	"PLAIN",
-	"DH-BLOWFISH",
-	"DH-AES",
-	"EXTERNAL"
-};
-
 void
 inbound_sasl_supportedmechs (server *serv, char *list)
 {
-	int i;
-
-	if (serv->sasl_mech != MECH_EXTERNAL)
+	if (serv->sasl_mech != MECH_EXTERNAL && strstr (list, sasl_mechanisms[MECH_PLAIN]) != NULL)
 	{
-		/* Use most secure one supported */
-		for (i = MECH_AES; i >= MECH_PLAIN; i--)
-		{
-			if (strstr (list, sasl_mechanisms[i]) != NULL)
-			{
-				serv->sasl_mech = i;
-				serv->retry_sasl = TRUE;
-				tcp_sendf (serv, "AUTHENTICATE %s\r\n", sasl_mechanisms[i]);
-				return;
-			}
-		}
+		serv->sasl_mech = MECH_PLAIN;
+		serv->retry_sasl = TRUE;
+		tcp_sendf (serv, "AUTHENTICATE %s\r\n", sasl_mechanisms[MECH_PLAIN]);
+		return;
 	}
 
 	/* Abort, none supported */
@@ -1876,12 +1862,6 @@ inbound_sasl_authenticate (server *serv, char *data)
 			pass = encode_sasl_pass_plain (user, serv->password);
 			break;
 #ifdef USE_OPENSSL
-		case MECH_BLOWFISH:
-			pass = encode_sasl_pass_blowfish (user, serv->password, data);
-			break;
-		case MECH_AES:
-			pass = encode_sasl_pass_aes (user, serv->password, data);
-			break;
 		case MECH_EXTERNAL:
 			pass = g_strdup ("+");
 			break;
@@ -1911,13 +1891,5 @@ inbound_sasl_error (server *serv)
 	if (serv->retry_sasl && !serv->sent_saslauth)
 		return 1;
 
-	/* If server sent 904 before we sent password,
-		* mech not support so fallback to next mech */
-	if (!serv->sent_saslauth && serv->sasl_mech != MECH_EXTERNAL && serv->sasl_mech != MECH_PLAIN)
-	{
-		serv->sasl_mech -= 1;
-		tcp_sendf (serv, "AUTHENTICATE %s\r\n", sasl_mechanisms[serv->sasl_mech]);
-		return 1;
-	}
 	return 0;
 }

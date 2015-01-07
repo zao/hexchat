@@ -422,11 +422,9 @@ typedef struct session
 	void (*scrollback_replay_marklast) (struct session *sess);
 } session;
 
-/* SASL Mechanisms */
+/* SASL mechanisms. Used as an index in sasl_mechanisms array in inbound.c. */
 #define MECH_PLAIN 0
-#define MECH_BLOWFISH 1
-#define MECH_AES 2
-#define MECH_EXTERNAL 3
+#define MECH_EXTERNAL 1
 
 typedef struct server
 {
