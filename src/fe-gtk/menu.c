@@ -1761,9 +1761,9 @@ static struct mymenu mymenu[] = {
 #define DETACH_OFFSET (12)
 	{0, menu_detach, GTK_STOCK_REDO, M_MENUSTOCK, 0, 0, 1},	/* 12 */
 #define CLOSE_OFFSET (13)
-	{0, menu_close, GTK_STOCK_CLOSE, M_MENUSTOCK, 0, 0, 1, GDK_KEY_w},
+	{0, menu_close, GTK_STOCK_CLOSE, M_MENUSTOCK, 0, 0, 1},
 	{0, 0, 0, M_SEP, 0, 0, 0},
-	{N_("_Quit"), menu_quit, GTK_STOCK_QUIT, M_MENUSTOCK, 0, 0, 1, GDK_KEY_q},	/* 15 */
+	{N_("_Quit"), menu_quit, GTK_STOCK_QUIT, M_MENUSTOCK, 0, 0, 1},	/* 15 */
 
 	{N_("_View"), 0, 0, M_NEWMENU, 0, 0, 1},
 #define MENUBAR_OFFSET (17)
@@ -2389,7 +2389,6 @@ normalitem:
 				gtk_widget_add_accelerator (item, "activate", accel_group,
 										mymenu[i].key,
 										mymenu[i].key == GDK_KEY_F1 ? 0 :
-										mymenu[i].key == GDK_KEY_w ? close_mask :
 										(g_ascii_isupper (mymenu[i].key)) ?
 											STATE_SHIFT | STATE_CTRL :
 											STATE_CTRL,
